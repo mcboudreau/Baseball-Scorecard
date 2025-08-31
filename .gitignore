@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.env
+.venv/
+.env.*
+
+# VS Code
+.vscode/
+
+# Byte-compiled / cache
+*.egg-info/
+*.egg
+.eggs/
+
+# Alembic
+alembic/__pycache__/
+alembic/versions/__pycache__/
+
+# Docker
+pgdata/
