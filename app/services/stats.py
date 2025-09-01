@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from collections import defaultdict
 from ..models import PlateAppearance, PAResult, Player, Game
 from ..schemas import PlayerStats, BoxScore
-from typing import Literal
+from typing import Literal, List
 
 Metric = Literal["avg", "obp", "slg", "ops"]
 
@@ -249,3 +249,25 @@ def compute_season_pitching(db: Session, season_id: int) -> list[PitcherStats]:
             )
         )
     return result
+
+def compute_season_pitching_leaderboard(
+    db: Session,
+    season_id: int,
+    min_ip: float = 0.0,   # e.g., 10.0 means 10 innings minimum
+    limit: int = 10,
+) -> List[PitcherStats]:
+    # Reuse the season aggregation
+    stats = compute_season_pitching(db, season_id)
+
+    # Convert min_ip to outs for filtering (3 outs per inning)
+    min_outs = int(min_ip * 3 + 0.5)
+
+    # Filter: pitchers meeting minimum IP (outs) AND with any IP
+    qualified = [s for s in stats if s.outs >= max(1, min_outs)]
+
+    # Sort by ERA ascending; tie-breakers: more outs (IP), fewer RA, more SO
+    qualified.sort(
+        key=lambda s: (s.era, -s.outs, s.ra, -s.so)
+    )
+
+    return qualified[: max(0, limit)]
