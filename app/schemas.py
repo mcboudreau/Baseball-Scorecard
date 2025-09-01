@@ -94,3 +94,24 @@ class PlayerStats(BaseModel):
 class BoxScore(BaseModel):
     game_id: int
     batting: list[PlayerStats]
+
+class PitcherStats(BaseModel):
+    pitcher_id: int
+    first_name: str
+    last_name: str
+    bf: int
+    ab: int
+    h: int
+    bb: int
+    hbp: int
+    so: int
+    hr: int
+    sf: int
+    outs: int          # raw outs
+    ip: str            # e.g., "5.2"
+    ra: int            # runs allowed (RBIs proxy)
+    era: float         # ERA (approx from RA)
+
+class GamePitching(BaseModel):
+    game_id: int
+    pitching: list[PitcherStats]

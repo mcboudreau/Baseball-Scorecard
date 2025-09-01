@@ -2,9 +2,6 @@ from fastapi import FastAPI
 from .routers import seasons, teams, players, games, plate_appearances
 from .db import Base, engine
 
-# Create tables if they don't exist (alembic is preferred, but this helps first run)
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="Baseball Scorecard API", version="0.1.0")
 
 @app.get("/healthz")

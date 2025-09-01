@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from ..db import get_db
 from .. import models, schemas
+from ..services.stats import compute_boxscore, compute_game_pitching
 
 router = APIRouter(prefix="/games", tags=["games"])
 
@@ -43,3 +44,11 @@ def set_lineup(game_id: int, body: schemas.LineupSet, db: Session = Depends(get_
         ))
     db.commit()
     return {"ok": True}
+
+
+@router.get("/{game_id}/pitching", response_model=schemas.GamePitching)
+def game_pitching(game_id: int, db: Session = Depends(get_db)):
+    game = db.get(models.Game, game_id)
+    if not game:
+        raise HTTPException(404, "Game not found")
+    return compute_game_pitching(db, game_id)

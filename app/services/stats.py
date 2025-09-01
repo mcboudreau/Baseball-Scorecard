@@ -135,3 +135,117 @@ def compute_season_leaderboard(
     stats.sort(key=key_fn, reverse=True)
 
     return stats[: max(0, limit)]
+
+def _outs_to_ip_str(outs: int) -> str:
+    # 3 outs per inning; remainder is .0/.1/.2 style
+    return f"{outs // 3}.{outs % 3}"
+
+def _era_approx(ra: int, outs: int) -> float:
+    ip = outs / 3.0
+    return round((9.0 * ra / ip) if ip > 0 else 0.0, 2)
+
+def compute_game_pitching(db: Session, game_id: int) -> GamePitching:
+    rows = (
+        db.query(PlateAppearance, Player)
+          .join(Player, Player.id == PlateAppearance.pitcher_id)
+          .filter(PlateAppearance.game_id == game_id, PlateAppearance.pitcher_id.isnot(None))
+          .all()
+    )
+
+    agg = {}
+    for pa, pitcher in rows:
+        pid = pitcher.id
+        s = agg.setdefault(pid, {
+            "first": pitcher.first_name, "last": pitcher.last_name,
+            "bf": 0, "ab": 0, "h": 0, "bb": 0, "hbp": 0, "so": 0, "hr": 0, "sf": 0, "outs": 0, "ra": 0
+        })
+        s["bf"] += 1
+
+        r = pa.result
+        # AB, hits, HR
+        if r in (PAResult.SINGLE, PAResult.DOUBLE, PAResult.TRIPLE, PAResult.HOMERUN, PAResult.OUT, PAResult.STRIKEOUT):
+            s["ab"] += 1
+        if r in (PAResult.SINGLE, PAResult.DOUBLE, PAResult.TRIPLE, PAResult.HOMERUN):
+            s["h"] += 1
+        if r == PAResult.HOMERUN:
+            s["hr"] += 1
+
+        # Walk / HBP
+        if r == PAResult.WALK:
+            s["bb"] += 1
+        if r == PAResult.HBP:
+            s["hbp"] += 1
+
+        # Outs recorded while this pitcher is in:
+        # count K, OUT, SF as outs
+        if r in (PAResult.STRIKEOUT, PAResult.OUT, PAResult.SAC_FLY):
+            s["outs"] += 1
+        if r == PAResult.STRIKEOUT:
+            s["so"] += 1
+        if r == PAResult.SAC_FLY:
+            s["sf"] += 1
+
+        # Runs allowed proxy (sum RBIs)
+        s["ra"] += (pa.rbis or 0)
+
+    result = []
+    for pid, s in agg.items():
+        ip = _outs_to_ip_str(s["outs"])
+        era = _era_approx(s["ra"], s["outs"])
+        result.append(
+            PitcherStats(
+                pitcher_id=pid, first_name=s["first"], last_name=s["last"],
+                bf=s["bf"], ab=s["ab"], h=s["h"], bb=s["bb"], hbp=s["hbp"], so=s["so"], hr=s["hr"], sf=s["sf"],
+                outs=s["outs"], ip=ip, ra=s["ra"], era=era
+            )
+        )
+    return GamePitching(game_id=game_id, pitching=result)
+
+def compute_season_pitching(db: Session, season_id: int) -> list[PitcherStats]:
+    rows = (
+        db.query(PlateAppearance, Player)
+          .join(Player, Player.id == PlateAppearance.pitcher_id)
+          .join(Game, Game.id == PlateAppearance.game_id)
+          .filter(Game.season_id == season_id, PlateAppearance.pitcher_id.isnot(None))
+          .all()
+    )
+
+    agg = {}
+    for pa, pitcher in rows:
+        pid = pitcher.id
+        s = agg.setdefault(pid, {
+            "first": pitcher.first_name, "last": pitcher.last_name,
+            "bf": 0, "ab": 0, "h": 0, "bb": 0, "hbp": 0, "so": 0, "hr": 0, "sf": 0, "outs": 0, "ra": 0
+        })
+        s["bf"] += 1
+        r = pa.result
+        if r in (PAResult.SINGLE, PAResult.DOUBLE, PAResult.TRIPLE, PAResult.HOMERUN, PAResult.OUT, PAResult.STRIKEOUT):
+            s["ab"] += 1
+        if r in (PAResult.SINGLE, PAResult.DOUBLE, PAResult.TRIPLE, PAResult.HOMERUN):
+            s["h"] += 1
+        if r == PAResult.HOMERUN:
+            s["hr"] += 1
+        if r == PAResult.WALK:
+            s["bb"] += 1
+        if r == PAResult.HBP:
+            s["hbp"] += 1
+        if r in (PAResult.STRIKEOUT, PAResult.OUT, PAResult.SAC_FLY):
+            s["outs"] += 1
+        if r == PAResult.STRIKEOUT:
+            s["so"] += 1    
+        if r == PAResult.SAC_FLY:
+            s["sf"] += 1
+        s["ra"] += (pa.rbis or 0)
+
+    result = []
+    for pid, s in agg.items():
+        ip = _outs_to_ip_str(s["outs"])
+        era = _era_approx(s["ra"], s["outs"])
+        result.append(
+            PitcherStats(
+                pitcher_id=pid, first_name=s["first"], last_name=s["last"],
+                bf=s["bf"], ab=s["ab"], h=s["h"], bb=s["bb"], hbp=s["hbp"], so=s["so"], hr=s["hr"], sf=s["sf"],
+                outs=s["outs"], ip=ip, ra=s["ra"], era=era
+            )
+        )
+    return result

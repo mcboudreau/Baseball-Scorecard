@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from ..db import get_db
 from .. import models, schemas
-from ..services.stats import compute_season_stats, compute_season_leaderboard
+from ..services.stats import compute_season_stats, compute_season_leaderboard, compute_season_pitching
 
 router = APIRouter(prefix="/seasons", tags=["seasons"])
 
@@ -31,3 +31,9 @@ def season_leaderboard(
     if not db.get(models.Season, season_id):
         raise HTTPException(404, "Season not found")
     return compute_season_leaderboard(db, season_id, metric=metric, min_ab=min_ab, limit=limit)
+
+@router.get("/{season_id}/pitching", response_model=list[schemas.PitcherStats])
+def season_pitching(season_id: int, db: Session = Depends(get_db)):
+    if not db.get(models.Season, season_id):
+        raise HTTPException(404, "Season not found")
+    return compute_season_pitching(db, season_id)
